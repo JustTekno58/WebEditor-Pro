@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebEditor Pro</title>
+    <!-- Font Awesome icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <style>
+        :root {
+            --primary-color: #007acc;
+            --secondary-color: #1e1e1e;
+            --text-color: #d4d4d4;
+            --border-color: #454545;
+            --hover-color: #2a2d2e;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: var(--secondary-color);
+            color: var(--text-color);
+            line-height: 1.6;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px;
+            background-color: var(--secondary-color);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .tool-group {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        button {
+            padding: 6px 12px;
+            background-color: var(--primary-color);
+            border: none;
+            color: white;
+            cursor: pointer;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: #005999;
+        }
+
+        select, input[type="number"] {
+            padding: 6px;
+            background-color: var(--secondary-color);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            border-radius: 4px;
+        }
+
+        .content {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .content.split {
+            display: flex;
+        }
+
+        .editor-container, .preview-container {
+            flex: 1;
+            position: relative;
+            resize: horizontal;
+            overflow: auto;
+            min-width: 200px;
+        }
+
+        .resize-handle {
+            width: 5px;
+            background: var(--border-color);
+            cursor: col-resize;
+        }
+
+        .preview-container {
+            border-left: 1px solid var(--border-color);
+        }
+
+        #preview-frame {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background-color: white;
+            transition: width 0.3s ease;
+        }
+
+        .status-bar {
+            padding: 4px 8px;
+            background-color: var(--secondary-color);
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+        }
+
+        .preview-toolbar {
+            padding: 4px;
+            background-color: var(--secondary-color);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background-color: var(--secondary-color);
+            margin: 10% auto;
+            padding: 20px;
+            border-radius: 8px;
+            width: 80%;
+            max-width: 500px;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            color: var(--text-color);
+            font-size: 24px;
+            padding: 0;
+        }
+
+        .notification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 12px 24px;
+            border-radius: 4px;
+            color: white;
+            z-index: 1000;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .notification.success { background-color: #28a745; }
+        .notification.error { background-color: #dc3545; }
+        .notification.info { background-color: #17a2b8; }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="toolbar">
+            <div class="tool-group">
+                <button id="save-btn" title="Kaydet (Ctrl+S)">
+                    <i class="fas fa-save"></i> Kaydet
+                </button>
+                <button id="undo-btn" title="Geri Al (Ctrl+Z)">
+                    <i class="fas fa-undo"></i>
+                </button>
+                <button id="redo-btn" title="İleri Al (Ctrl+Y)">
+                    <i class="fas fa-redo"></i>
+                </button>
+                <button id="format-btn" title="Formatla (Ctrl+Shift+F)">
+                    <i class="fas fa-align-left"></i>
+                </button>
+                <button id="find-btn" title="Bul (Ctrl+F)">
+                    <i class="fas fa-search"></i>
+                </button>
+            </div>
+            <div class="tool-group">
+                <select id="font-family">
+                    <option value="Consolas">Consolas</option>
+                    <option value="Monaco">Monaco</option>
+                    <option value="Source Code Pro">Source Code Pro</option>
+                </select>
+                <input type="number" id="font-size" min="10" max="30" value="14" title="Font Boyutu">
+                <select id="language-select">
+                    <option value="html">HTML</option>
+                    <option value="css">CSS</option>
+                    <option value="javascript">JavaScript</option>
+                </select>
+                <button id="split-toggle">
+                    <i class="fas fa-columns"></i>
+                </button>
+                <button id="fullscreen-btn">
+                    <i class="fas fa-expand"></i>
+                </button>
+                <button id="settings-btn">
+                    <i class="fas fa-cog"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="editor-container">
+                <div id="editor"></div>
+            </div>
+            <div class="preview-container">
+                <div class="preview-toolbar">
+                    <select id="device-select">
+                        <option value="desktop">Masaüstü</option>
+                        <option value="tablet">Tablet (768px)</option>
+                        <option value="mobile">Mobil (375px)</option>
+                    </select>
+                </div>
+                <iframe id="preview-frame"></iframe>
+            </div>
+        </div>
+
+        <div class="status-bar">
+            <span id="cursor-position"></span>
+            <span id="file-info"></span>
+            <span id="editor-mode"></span>
+        </div>
+    </div>
+
+    <div id="settings-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Editör Ayarları</h2>
+                <button class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="settings-form">
+                    <div class="form-group">
+                        <label>Tema</label>
+                        <select id="theme-select">
+                            <option value="vs-dark">Koyu</option>
+                            <option value="vs-light">Açık</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Otomatik Kaydetme</label>
+                        <input type="checkbox" id="auto-save">
+                    </div>
+                    <button type="submit">Kaydet</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Monaco Editor CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.js"></script>
+    <!-- Prettier CDN -->
+    <script src="https://unpkg.com/prettier@2.8.8/standalone.js"></script>
+    <script src="https://unpkg.com/prettier@2.8.8/parser-html.js"></script>
+    <script src="https://unpkg.com/prettier@2.8.8/parser-babel.js"></script>
+    <script src="https://unpkg.com/prettier@2.8.8/parser-postcss.js"></script>
+
+    <script>
+        require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs' }});
+
+        let editor;
+        let currentLanguage = 'html';
+        let autoSaveInterval;
+        const AUTO_SAVE_DELAY = 30000;
+
+        require(['vs/editor/editor.main'], function() {
+            editor = monaco.editor.create(document.getElementById('editor'), {
+                value: '',
+                language: currentLanguage,
+                theme: 'vs-dark',
+                fontSize: 14,
+                minimap: { enabled: true },
+                automaticLayout: true,
+                lineNumbers: 'on',
+                folding: true,
+                autoClosingBrackets: 'always',
+                autoClosingQuotes: 'always',
+                suggestOnTriggerCharacters: true,
+                snippetSuggestions: 'inline',
+                multiCursorModifier: 'alt',
+                formatOnPaste: true,
+                formatOnType: true,
+                roundedSelection: false,
+                scrollBeyondLastLine: false,
+                readOnly: false,
+                cursorStyle: 'line',
+                tabSize: 2,
+            });
+
+            setupEventListeners();
+            loadSettings();
+            setupKeyboardShortcuts();
+            setupAutoSave();
+        });
+
+        function setupEventListeners() {
+            // Dil değiştirme
+            document.getElementById('language-select').addEventListener('change', (e) => {
+                currentLanguage = e.target.value;
+                monaco.editor.setModelLanguage(editor.getModel(), currentLanguage);
+                updateEditorMode();
+            });
+
+            // Font ailesi
+            document.getElementById('font-family').addEventListener('change', (e) => {
+                editor.updateOptions({ fontFamily: e.target.value });
+            });
+
+            // Font boyutu
+            document.getElementById('font-size').addEventListener('change', (e) => {
+                editor.updateOptions({ fontSize: parseInt(e.target.value) });
+            });
+
+            // Split view
+            document.getElementById('split-toggle').addEventListener('click', () => {
+                document.querySelector('.content').classList.toggle('split');
+                editor.layout();
+            });
+
+            // Tam ekran
+            document.getElementById('fullscreen-btn').addEventListener('click', () => {
+                document.documentElement.requestFullscreen();
+            });
+
+            // Responsive önizleme
+            document.getElementById('device-select').addEventListener('change', (e) => {
+                const previewFrame = document.getElementById('preview-frame');
+                switch(e.target.value) {
+                    case 'tablet':
+                        previewFrame.style.width = '768px';
+                        break;
+                    case 'mobile':
+                        previewFrame.style.width = '375px';
+                        break;
+                    default:
+                        previewFrame.style.width = '100%';
+                }
+            });
+
+            // Diğer butonlar
+            document.getElementById('save-btn').addEventListener('click', saveContent);
+            document.getElementById('format-btn').addEventListener('click', formatCode);
+            document.getElementById('undo-btn').addEventListener('click', () => editor.trigger('keyboard', 'undo'));
+            document.getElementById('redo-btn').addEventListener('click', () => editor.trigger('keyboard', 'redo'));
+            document.getElementById('find-btn').addEventListener('click', () => editor.trigger('keyboard', 'actions.find'));
+            document.getElementById('settings-btn').addEventListener('click', openSettings);
+            document.querySelector('.close-btn').addEventListener('click', closeSettings);
+            document.getElementById('settings-form').addEventListener('submit', saveSettings);
+
+            // Cursor pozisyonu
+            editor.onDidChangeCursorPosition((e) => {
+                updateCursorPosition(e.position);
+            });
+
+            // Kod değişikliği
+            editor.onDidChangeModelContent(() => {
+                validateCode();
+                updatePreview();
+            });
+        }
+
+        function setupKeyboardShortcuts() {
+            editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KEY_S, saveContent);
+            editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KEY_F, () => {
+                editor.getAction('actions.find').run();
+            });
+            editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KEY_F, formatCode);
+        }
+
+        function setupAutoSave() {
+            const autoSaveInterval = setInterval(() => {
+                if (editor && document.getElementById('auto-save').checked) {
+                    saveContent();
+                    const timestamp = new Date().toISOString();
+                    localStorage.setItem(`backup_${timestamp}`, editor.getValue());
+                    manageBackups(5);
+                }
+            }, AUTO_SAVE_DELAY);
+        }
+
+        function manageBackups(keepCount) {
+            const backups = Object.keys(localStorage)
+                .filter(key => key.startsWith('backup_'))
+                .sort()
+                .reverse();
+            
+            while (backups.length > keepCount) {
+                localStorage.removeItem(backups.pop());
+            }
+        }
+
+        function formatCode() {
+            try {
+                const content = editor.getValue();
+                let formatted;
+
+                switch (currentLanguage) {
+                    case 'html':
+                        formatted = prettier.format(content, {
+                            parser: 'html',
+                            plugins: [prettierPlugins.html],
+                            printWidth: 80,
+                            tabWidth: 2,
+                            useTabs: false,
+                        });
+                        break;
+                    case 'css':
+                        formatted = prettier.format(content, {
+                            parser: 'css',
+                            plugins: [prettierPlugins.postcss],
+                            printWidth: 80,
+                            tabWidth: 2,
+                        });
+                        break;
+                    case 'javascript':
+                        formatted = prettier.format(content, {
+                            parser: 'babel',
+                            plugins: [prettierPlugins.babel],
+                            printWidth: 80,
+                            tabWidth: 2,
+                        });
+                        break;
+                }
+
+                editor.setValue(formatted);
+                showNotification('Kod formatlandı', 'success');
+            } catch (error) {
+                showNotification('Formatlama hatası: ' + error.message, 'error');
+            }
+        }
+
+        function updatePreview() {
+            const previewFrame = document.getElementById('preview-frame');
+            const content = editor.getValue();
+
+            const previewDoc = previewFrame.contentDocument || previewFrame.contentWindow.document;
+            previewDoc.open();
+            
+            if (currentLanguage === 'html') {
+                previewDoc.write(content);
+            } else if (currentLanguage === 'css') {
+                previewDoc.write(`
+                    <style>${content}</style>
+                    <div class="preview-content">CSS Önizleme</div>
+                `);
+            } else if (currentLanguage === 'javascript') {
+                previewDoc.write(`
+                    <script>${content}<\/script>
+                    <div class="preview-content">JavaScript Önizleme</div>
+                `);
+            }
+            
+            previewDoc.close();
+        }
+
+        function validateCode() {
+            const content = editor.getValue();
+            
+            if (currentLanguage === 'html') {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(content, 'text/html');
+                const errors = doc.getElementsByTagName('parsererror');
+                
+                if (errors.length) {
+                    showNotification('HTML doğrulama hatası tespit edildi', 'error');
+                }
+            }
+        }
+
+        function saveContent() {
+            const content = editor.getValue();
+            localStorage.setItem('editorContent_' + currentLanguage, content);
+            showNotification('İçerik kaydedildi', 'success');
+        }
+
+        function loadSettings() {
+            const savedSettings = localStorage.getItem('editorSettings');
+            if (savedSettings) {
+                const settings = JSON.parse(savedSettings);
+                
+                monaco.editor.setTheme(settings.theme);
+                document.getElementById('theme-select').value = settings.theme;
+                
+                editor.updateOptions({ 
+                    fontSize: settings.fontSize,
+                    fontFamily: settings.fontFamily
+                });
+                
+                document.getElementById('font-size').value = settings.fontSize;
+                document.getElementById('font-family').value = settings.fontFamily;
+                document.getElementById('auto-save').checked = settings.autoSave;
+                
+                if (settings.autoSave) {
+                    setupAutoSave();
+                }
+            }
+        }
+
+        function openSettings() {
+            document.getElementById('settings-modal').style.display = 'block';
+        }
+
+        function closeSettings() {
+            document.getElementById('settings-modal').style.display = 'none';
+        }
+
+        function saveSettings(e) {
+            e.preventDefault();
+            
+            const theme = document.getElementById('theme-select').value;
+            const fontSize = parseInt(document.getElementById('font-size').value);
+            const fontFamily = document.getElementById('font-family').value;
+            const autoSave = document.getElementById('auto-save').checked;
+
+            monaco.editor.setTheme(theme);
+            editor.updateOptions({ 
+                fontSize: fontSize,
+                fontFamily: fontFamily
+            });
+
+            const settings = { theme, fontSize, fontFamily, autoSave };
+            localStorage.setItem('editorSettings', JSON.stringify(settings));
+
+            if (autoSave) {
+                setupAutoSave();
+            } else {
+                clearInterval(autoSaveInterval);
+            }
+
+            closeSettings();
+            showNotification('Ayarlar kaydedildi', 'success');
+        }
+
+        function updateCursorPosition(position) {
+            document.getElementById('cursor-position').textContent = 
+                `Satır: ${position.lineNumber}, Sütun: ${position.column}`;
+        }
+
+        function updateEditorMode() {
+            document.getElementById('editor-mode').textContent = 
+                `Mod: ${currentLanguage.toUpperCase()}`;
+        }
+
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.textContent = message;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
+        }
+
+        // Sayfa yüklendiğinde son kaydedilen içeriği yükle
+        window.addEventListener('load', () => {
+            const savedContent = localStorage.getItem('editorContent_' + currentLanguage);
+            if (savedContent) {
+                editor.setValue(savedContent);
+            }
+            updateEditorMode();
+        });
+    </script>
+</body>
+</html>
